@@ -1,0 +1,8 @@
+graphon-client
+streamlit
+pandas
+plotly
+python-dotenv
+aiohttp
+watchdog
+yt-dlp
