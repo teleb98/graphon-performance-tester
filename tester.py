@@ -58,7 +58,7 @@ class GraphonTester:
         group_name = f"test_group_{int(time.time())}"
         print(f"Uploading {file_path} and creating group {group_name}...")
         
-        self.group_id = await getattr(self.client, 'upload_process_and_create_group')( (
+        self.group_id = await getattr(self.client, 'upload_process_and_create_group')(
             file_paths=[file_path], 
             group_name=group_name
         )
