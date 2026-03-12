@@ -180,10 +180,23 @@ with tab1:
     if st.session_state.test_results is not None:
         st.divider()
         st.header("Final Report")
+        
+        rep_col1, rep_col2 = st.columns([1, 1])
         df = st.session_state.test_results
         
-        st.download_button("Download Results CSV", df.to_csv().encode('utf-8'), "graphon_results.csv", "text/csv")
+        with rep_col1:
+            st.subheader("Video Source")
+            if target_path and os.path.exists(target_path):
+                st.video(target_path)
+            else:
+                st.info("Video playback not available.")
+                
+        with rep_col2:
+            st.subheader("Results Data")
+            st.dataframe(df, use_container_width=True, height=400)
+            st.download_button("Download Results CSV", df.to_csv().encode('utf-8'), "graphon_results.csv", "text/csv")
         
+        st.divider()
         st.subheader("VLM Comparison Notes")
         st.text_area("Notes", placeholder="Enter your observations here...", key="final_notes")
 
