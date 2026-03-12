@@ -18,14 +18,17 @@ except ImportError:
 API_KEY = os.getenv("GRAPHON_API_KEY", "")
 
 class GraphonTester:
-    def __init__(self, api_key=None):
+    def __init__(self, api_key=None, custom_prompts=None):
         self.api_key = api_key or API_KEY
         if GraphonClient:
             self.client = GraphonClient(api_key=self.api_key)
         else:
             self.client = None
             
-        self.prompts = [
+        if custom_prompts:
+            self.prompts = custom_prompts
+        else:
+            self.prompts = [
             "Identify the primary target audience for this video based on visuals.",
             "List specific product categories that would be suitable for advertising here.",
             "Are there any brand safety concerns (violence, adult content, etc.)?",
@@ -48,49 +51,49 @@ class GraphonTester:
             "Identify the main activity happening and its relevance to services."
         ]
 
-    async def run_test(self, file_path):
+    async def process_video(self, file_path):
         if not self.client:
             raise RuntimeError("GraphonClient not initialized.")
             
-        # 1. Upload & Process & Create Group
-        # Create a unique group name
         group_name = f"test_group_{int(time.time())}"
         print(f"Uploading {file_path} and creating group {group_name}...")
         
-        try:
-            # Use upload_process_and_create_group which handles upload, processing and grouping
-            # Note: file_paths expects a list
-            group_id = await self.client.upload_process_and_create_group(
-                file_paths=[file_path], 
-                group_name=group_name
-            )
-            print(f"Group created. ID: {group_id}. Processing complete.")
+        self.group_id = await getattr(self.client, 'upload_process_and_create_group')( (
+            file_paths=[file_path], 
+            group_name=group_name
+        )
+        print(f"Group created. ID: {self.group_id}. Processing complete.")
+        return self.group_id
+
+    async def run_single_query(self, prompt, prompt_id=0):
+        if not hasattr(self, 'group_id') or not self.group_id:
+            raise RuntimeError("Group ID not set. Video must be processed first.")
             
-            # 2. Query Loop
+        start_time = time.time()
+        response = await self.client.query_group(group_id=self.group_id, query=prompt)
+        end_time = time.time()
+        latency = end_time - start_time
+        
+        response_text = getattr(response, 'answer', str(response))
+        
+        return {
+            "prompt_id": prompt_id,
+            "prompt": prompt,
+            "response": response_text,
+            "latency_sec": round(latency, 2),
+            "response_len": len(response_text),
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+    async def run_test(self, file_path):
+        try:
+            if not getattr(self, 'group_id', None):
+                await self.process_video(file_path)
+                
             print("Starting Prompt Test...")
             for i, prompt in enumerate(self.prompts):
-                start_time = time.time()
-                
-                # Graphon API call - query_group
-                # Correct signature: query_group(group_id, query, ...)
-                response = await self.client.query_group(group_id=group_id, query=prompt)
-                
-                end_time = time.time()
-                latency = end_time - start_time
-                
-                # Handle response structure
-                # QueryResponse object has 'answer' attribute
-                response_text = getattr(response, 'answer', str(response))
-                
-                result = {
-                    "prompt_id": i,
-                    "prompt": prompt,
-                    "response": response_text,
-                    "latency_sec": round(latency, 2),
-                    "response_len": len(response_text),
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-                }
-                print(f"Finished prompt {i+1}/{len(self.prompts)}: {latency:.2f}s")
+                result = await self.run_single_query(prompt, i)
+                print(f"Finished prompt {i+1}/{len(self.prompts)}: {result['latency_sec']:.2f}s")
                 yield result
                 
         except Exception as e:
